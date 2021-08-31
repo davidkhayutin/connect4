@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
+import Confetti from 'react-confetti'
+
 import styled from 'styled-components';
 import './App.css';
+
+
 
 
 const BoardContainer = styled.div`
@@ -10,6 +14,7 @@ const BoardContainer = styled.div`
   width: 800px;
   padding: 8px;
   margin-top: 20px;
+
   .one {
     background-color: red;
    
@@ -37,8 +42,34 @@ const BoardContainer = styled.div`
       background: #000099;
       color: #00016C;
     }
-
+   
   }
+  .winner {
+    -webkit-animation: 2s rotate-right linear infinite;
+    animation: 2s rotate-right linear infinite;
+  }
+  @-webkit-keyframes rotate-right {
+    0% {
+      -webkit-transform: rotate(0deg);
+              transform: rotate(0deg);
+    }
+    100% {
+      -webkit-transform: rotate(360deg);
+              transform: rotate(360deg);
+    }
+  }
+  
+  @keyframes rotate-right {
+    0% {
+      -webkit-transform: rotate(0deg);
+              transform: rotate(0deg);
+    }
+    100% {
+      -webkit-transform: rotate(360deg);
+              transform: rotate(360deg);
+    }
+  }
+ 
 `
 
 const Cell = styled.div`
@@ -106,6 +137,7 @@ function App() {
   const [board, setBoard] = useState<Board>(intializeBoard())
   const [playerOneTurn, setPlayerOneTurn] = useState<boolean>(true)
   const [winner, setWinner] = useState(0)
+  const [winnigIndexs, setWinningIndexes] = useState<number[]>([])
 
   const fetchColumnIndexes = (column:number): Player[] =>{
     return [...Array(6)].map((a, b) => {
@@ -121,13 +153,18 @@ function App() {
   const checkColForFour = (col: number[]) => {
     if(winner) return
     const currentCol = col.map(idx => board[idx])
-    
     let player = 0;
     let count = 0;
-
-    currentCol.forEach((idx) => {
+    currentCol.forEach((idx, x) => {
       if(!idx) return
       if(count >= 3 && idx === player){
+        // eslint-disable-next-line array-callback-return
+        setWinningIndexes(col.filter(a => {
+          const possibleIndex = (board[a - 1] === player || board[a +1] === player) || (board[a - 7] === player || board[a + 7] === player)
+          if(board[a] === player && possibleIndex){
+            return a
+          }
+        }))
         setWinner(player)
       }
       if(idx !== player){
@@ -136,6 +173,7 @@ function App() {
         return
       }
       count += 1
+
     })
   }
 
@@ -154,25 +192,39 @@ function App() {
     })
   }
 
-  const checkDiagnoal = (column: number, index: number) => {
-    if(column <= 3){
-      const boardSlice = [
-        board[index],
-        board[index + 7 - 1],
-        board[index + 7 * 2 - 2],
-        board[index + 7 * 3 - 3]
-      ];
-      console.log("boardslice 1",boardSlice)
-    }
-
-    if(column >= 3){
-      const boardSlice = [
-        board[index],
-        board[index + 7 + 1],
-        board[index + 7 * 2 + 2],
-        board[index + 7 * 3 + 3]
-      ];
-      console.log("boardslice 2", boardSlice)
+  const checkDiagnoal = () => {
+    if(winner) return
+    for (let r = 0; r <= 2; r++) {
+      for (let c = 0; c < 7; c++) {
+        const index = r * 7 + c;
+          const boardSlice2 = [
+          board[index],
+          board[index + 7 - 1],
+          board[index + 7 * 2 - 2],
+          board[index + 7 * 3 - 3]];
+          const arraySet1 = new Set(boardSlice2)
+          if(arraySet1.size === 1 && (arraySet1.has(1) ||arraySet1.has(2))){
+            const value = arraySet1.has(1)? 1 : 2
+            setWinningIndexes([index, index + 7 - 1,index + 7 * 2 - 2 , index + 7 * 3 - 3])
+            setWinner(value)
+            return
+          } 
+          
+        const boardSlice = [
+          board[index],
+          board[index + 7 + 1],
+          board[index + 7 * 2 + 2],
+          board[index + 7 * 3 + 3]];
+          
+          const arraySet = new Set(boardSlice)
+         
+          if(arraySet.size === 1 && (arraySet.has(1) ||arraySet.has(2))){
+            const value = arraySet.has(1)? 1 : 2
+            setWinningIndexes([index, index + 7 + 1,index + 7 * 2 + 2 , index + 7 * 3 + 3])
+            setWinner(value)
+            return
+          }     
+      }
     }
   }
 
@@ -181,6 +233,7 @@ function App() {
   const checkForWinner = () => {
     checkVertical()
     checkHorizontal()
+    checkDiagnoal()
   }
 
 
@@ -190,7 +243,7 @@ function App() {
     if(lowestIndex || (lowestIndex === 0 && column === 0)){
       const value =  playerOneTurn? Player.One : Player.Two
       board[lowestIndex] = value
-      checkDiagnoal(column, lowestIndex)
+      
       setBoard(board)
       checkForWinner()
       setPlayerOneTurn(!playerOneTurn)
@@ -199,7 +252,8 @@ function App() {
 
   const renderCell  = (player: Player, index: number) => {
      const classes = {0: "zero", 1: "one", 2: "two"}
-    return <Cell key={index} onClick={()=>handleCellClick(index % 7)} className={classes[player]}/>
+     const isWinningNumber = winnigIndexs.includes(index) ? "winner" :""
+    return <Cell key={index} onClick={()=>handleCellClick(index % 7)} className={`${classes[player]} ${isWinningNumber}`}/>
   }
 
   const renderCells = () => {
@@ -210,11 +264,13 @@ function App() {
     setBoard(intializeBoard());
     setPlayerOneTurn(true)
     setWinner(0)
+    setWinningIndexes([])
   }
   const tieGame = board.find((a) => a === Player.None) === undefined
   
   return (
     <div className="App">
+      {winner > 0 && <Confetti width={2000} height={1500} />}
       <BoardContainer>
         {renderCells()} 
       </BoardContainer>
