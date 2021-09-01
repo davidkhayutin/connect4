@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { randomInt } from 'crypto';
+import React, { useState, useEffect } from 'react';
 import Confetti from 'react-confetti'
 
 import styled from 'styled-components';
@@ -118,6 +119,10 @@ const Turn = styled.div`
   font-size: 40px;
   margin: 20px 0;
 `
+const Title = styled(Turn)`
+
+ color: blue
+`
 
 const Button = styled.button``
 
@@ -138,6 +143,8 @@ function App() {
   const [playerOneTurn, setPlayerOneTurn] = useState<boolean>(true)
   const [winner, setWinner] = useState(0)
   const [winnigIndexs, setWinningIndexes] = useState<number[]>([])
+  const [computer, setComputer] = useState(false)
+  const [easy, setEasy] = useState(true)
 
   const fetchColumnIndexes = (column:number): Player[] =>{
     return [...Array(6)].map((a, b) => {
@@ -156,8 +163,7 @@ function App() {
     let player = 0;
     let count = 0;
     currentCol.forEach((idx, x) => {
-      if(!idx) return
-      if(count >= 3 && idx === player){
+      if(count >= 3 && idx === player && idx ){
         // eslint-disable-next-line array-callback-return
         setWinningIndexes(col.filter(a => {
           const possibleIndex = (board[a - 1] === player || board[a +1] === player) || (board[a - 7] === player || board[a + 7] === player)
@@ -166,6 +172,7 @@ function App() {
           }
         }))
         setWinner(player)
+        return
       }
       if(idx !== player){
         player = idx;
@@ -175,6 +182,57 @@ function App() {
       count += 1
 
     })
+  }
+
+  const checkColForThree = () => {
+
+    
+    let nextCol: any;
+
+    // all vertical 
+    const allColumns = [...Array(7)].map((a, b) => fetchColumnIndexes(b))
+
+    allColumns.forEach((vCol) => {
+      if(nextCol !== undefined) return
+      const currentCol = vCol.map(idx => board[idx])
+      let count = 0;
+    
+      currentCol.forEach((idx, x) => {
+        if(idx !== 1) return;
+        if(count >= 2 && !currentCol.includes(2)){
+          nextCol = vCol[0]
+        }
+        count += 1
+      })
+    })
+
+    // horizontal
+    if(!nextCol){
+      const allColumns = [...Array(6)].map((a,b) => [...Array(7)].map((c, d) => b * 7 + d ))
+      allColumns.forEach((col) => {
+        if(nextCol !== undefined) return
+        const currentCol = col.map(idx => board[idx])
+        let count = 0;
+    
+        currentCol.forEach((idx, x) => {
+          if(idx !== 1) {
+            count = 0
+            return
+          }
+          if(count >= 2){
+            console.log(currentCol)
+
+            nextCol = currentCol[idx - 1] === 0? currentCol[idx - 1] : currentCol[idx + 1]
+            return
+          }
+
+          count += 1
+        })
+
+      })  
+    }
+
+    return nextCol
   }
 
   const checkVertical =  () => {
@@ -228,8 +286,6 @@ function App() {
     }
   }
 
-
-
   const checkForWinner = () => {
     checkVertical()
     checkHorizontal()
@@ -238,6 +294,34 @@ function App() {
 
 
   const handleCellClick = (column: number) => {
+    if(computer && !playerOneTurn) return
+    if(winner) return
+    const lowestIndex= findLowestIndex(column) 
+    if(lowestIndex || (lowestIndex === 0 && column === 0)){
+      const value =  playerOneTurn? Player.One : Player.Two
+      board[lowestIndex] = value
+      
+      setBoard(board)
+      checkForWinner()
+      setPlayerOneTurn(!playerOneTurn)
+    }
+  }
+
+
+
+  const handleCellClickComputer = (column: number) => {
+    const stopWin = checkColForThree(); // will need to change to work  with all vertical and horizontal 
+
+    if(stopWin || stopWin === 0){
+      const lowestIndex = findLowestIndex(stopWin) 
+      if(lowestIndex){
+        board[lowestIndex] = Player.Two
+        setBoard(board);
+        checkForWinner();
+        setPlayerOneTurn(!playerOneTurn);
+      }
+      return
+    }
     if(winner) return
     const lowestIndex= findLowestIndex(column) 
     if(lowestIndex || (lowestIndex === 0 && column === 0)){
@@ -266,10 +350,31 @@ function App() {
     setWinner(0)
     setWinningIndexes([])
   }
+
   const tieGame = board.find((a) => a === Player.None) === undefined
+
+  useEffect(()=> {
+
+    if (!playerOneTurn && computer) {
+      const rndInt = Math.floor(Math.random() * 6) + 1;
+      setTimeout(() => {
+        handleCellClickComputer(rndInt)
+      },2000)
+
+    }
+    
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[playerOneTurn])
+
+  const switchMode = () => {
+    resetBoard()
+    setComputer(!computer)
+    setEasy(true)
+  }
   
   return (
     <div className="App">
+      <Title>Connect FOUR</Title>
       {winner > 0 && <Confetti width={2000} height={1500} />}
       <BoardContainer>
         {renderCells()} 
@@ -278,6 +383,17 @@ function App() {
       {winner > 0 && <Turn>Player {winner} Wins!</Turn>}
       {!winner && !tieGame && <Turn>Go Player: {playerOneTurn? 1 : 2} </Turn>}
       <Button onClick={resetBoard}>Reset Game</Button>
+      <form>
+       <input type="checkbox" name="comp" onChange={switchMode}/>
+       <label> Vs. Computer</label>
+      </form>
+    {computer && <form>
+       <input type="checkbox" name="comp" onChange={()=>setEasy(true)} checked={easy}/>
+       <label>Easy</label>
+       <input type="checkbox" name="comp" onChange={()=>setEasy(false)} checked={!easy} />
+       <label>Hard</label>
+      </form>}
+     
     </div>
   );
 }
